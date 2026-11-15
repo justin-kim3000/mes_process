@@ -137,3 +137,37 @@ class ResultOut(BaseModel):
     result_id: int
     product_lot_no: str | None
     wo_status: WoStatus
+
+
+# ---- 조회 ----
+class InventoryOut(BaseModel):
+    item_code: str
+    item_name: str
+    unit: str
+    stock_qty: Decimal
+
+
+class TraceInput(BaseModel):
+    input_lot: str
+    input_item: str
+    input_qty: Decimal
+
+
+class TraceOut(BaseModel):
+    product_lot: str
+    equipment_code: str
+    inputs: list[TraceInput]
+
+
+class YieldByEquipment(BaseModel):
+    equipment_code: str
+    good: Decimal
+    defect: Decimal
+    yield_pct: Decimal
+
+
+class YieldByWorkOrder(BaseModel):
+    wo_no: str
+    good: Decimal
+    defect: Decimal
+    yield_pct: Decimal
