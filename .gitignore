@@ -1,0 +1,13 @@
+# 비밀값
+.env
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+
+# OS
+.DS_Store
+
+# 개인 홍보·면접 자료 (공개하지 않음)
+career/
