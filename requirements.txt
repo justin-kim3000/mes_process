@@ -1,7 +1,10 @@
-fastapi
-uvicorn[standard]
-pydantic>=2
-sqlalchemy>=2
-pymysql
-pytest
-httpx
+# API
+fastapi==0.163.0
+uvicorn[standard]==0.54.0
+pydantic==2.14.3
+# DB 접근 (SQLAlchemy Core + text()만 사용, ORM 미사용)
+sqlalchemy==2.1.8
+pymysql==1.2.4
+# 테스트 (TestClient는 httpx2 필요)
+pytest==9.2.0
+httpx2==2.16.0
