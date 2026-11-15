@@ -1,12 +1,13 @@
-"""작업지시 API (API 8~10). 실적 등록(API 11)은 3단계에서 추가."""
+"""작업지시 API (API 8~11)."""
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection, RowMapping, text
 
 from app.db import get_conn
 from app.errors import invalid_item_type, not_found, wo_invalid_status
 from app.routers.items import fetch_item
-from app.schemas import WoStatus, WorkOrderCreate, WorkOrderOut
+from app.schemas import ResultCreate, ResultOut, WoStatus, WorkOrderCreate, WorkOrderOut
 from app.services.lot_no import insert_with_number
+from app.services.production import register_result
 
 router = APIRouter(tags=["작업지시"])
 
@@ -69,3 +70,9 @@ def start_work_order(wo_id: int, conn: Connection = Depends(get_conn)):
             {"wo_id": wo_id},
         )
         return fetch_work_order(conn, wo_id)
+
+
+@router.post("/work-orders/{wo_id}/results", response_model=ResultOut, status_code=201)
+def create_result(wo_id: int, body: ResultCreate, conn: Connection = Depends(get_conn)):
+    """생산실적 등록. 처리 순서는 services/production.py (설계서 5-4)."""
+    return register_result(conn, wo_id, body)

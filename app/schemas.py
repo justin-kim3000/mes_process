@@ -101,3 +101,39 @@ class WorkOrderOut(BaseModel):
     plan_date: date
     status: WoStatus
     created_at: datetime
+
+
+# ---- 생산실적 ----
+# 양품·불량 수량은 0 허용 (둘의 합은 0보다 커야 함)
+QtyZeroOk = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=4)]
+
+
+class ResultInput(BaseModel):
+    lot_id: int
+    qty: Qty
+
+
+class ResultCreate(BaseModel):
+    equipment_id: int
+    good_qty: QtyZeroOk = Decimal("0")
+    defect_qty: QtyZeroOk = Decimal("0")
+    defect_code: str | None = Field(default=None, max_length=30)
+    worker_name: str = Field(min_length=1, max_length=50)
+    start_at: datetime
+    end_at: datetime
+    inputs: list[ResultInput] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def check_basic(self) -> "ResultCreate":
+        # DB CHECK 제약과 같은 규칙을 입력 단계에서 422로 막는다
+        if self.good_qty + self.defect_qty <= 0:
+            raise ValueError("good_qty + defect_qty는 0보다 커야 함")
+        if self.end_at <= self.start_at:
+            raise ValueError("end_at은 start_at보다 뒤여야 함")
+        return self
+
+
+class ResultOut(BaseModel):
+    result_id: int
+    product_lot_no: str | None
+    wo_status: WoStatus
