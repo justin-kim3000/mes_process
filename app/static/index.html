@@ -94,7 +94,7 @@
   <div class="wrap">
     <div class="top">
       <h1>mini-mes</h1>
-      <span class="sub">볼트 가공 라인 · 현장 화면</span>
+      <span class="sub">볼트·너트·와셔 생산 · 현장 화면</span>
       <a href="/docs" target="_blank">API 문서(/docs) ↗</a>
     </div>
     <nav>
@@ -571,8 +571,10 @@ loaders.report = async () => {
     : emptyRow(4, "실적이 없습니다.");
   $("#rp-yield-eq").innerHTML = yieldRows(yEq, "equipment_code");
   $("#rp-yield-wo").innerHTML = yieldRows(yWo, "wo_no");
-  $("#tr-chips").innerHTML = fgLots.length
-    ? `<span class="hint" style="align-self:center">완제품 LOT:</span>` + fgLots.map((l) => `<button class="chip" data-lot="${esc(l.lot_no)}">${esc(l.lot_no)}</button>`).join("")
+  // 최근 완제품 LOT 12개만 버튼으로 (나머지는 번호 직접 입력)
+  const recent = fgLots.slice(-12).reverse();
+  $("#tr-chips").innerHTML = recent.length
+    ? `<span class="hint" style="align-self:center">최근 완제품 LOT:</span>` + recent.map((l) => `<button class="chip" data-lot="${esc(l.lot_no)}">${esc(l.lot_no)}</button>`).join("")
     : `<span class="hint">아직 생산된 완제품 LOT이 없습니다.</span>`;
 };
 
