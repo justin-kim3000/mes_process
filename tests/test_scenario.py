@@ -122,3 +122,43 @@ def test_조회_빈_상태와_by_파라미터_검증(client):
     assert ok(client.get("/reports/yield", params={"by": "equipment"})) == []
     assert client.get("/reports/yield").status_code == 422
     assert client.get("/reports/yield", params={"by": "worker"}).status_code == 422
+
+
+# ---- 화면 지원 (6단계) ----
+def test_LOT_목록과_LOT별_남은_재고(client):
+    s = run_scenario(client)
+    raw = ok(client.get("/lots", params={"item_type": "RAW"}))
+    assert {l["lot_no"]: Decimal(l["stock_qty"]) for l in raw} == {
+        s["rod"]["lot_no"]: Decimal("170"),
+        s["plating"]["lot_no"]: Decimal("9.7"),
+    }
+    fg = ok(client.get("/lots", params={"item_type": "FINISHED"}))
+    assert [(l["lot_no"], Decimal(l["stock_qty"])) for l in fg] == [
+        (f"FG-{T}-001", Decimal("480")),
+        (f"FG-{T}-002", Decimal("520")),
+    ]
+    assert len(ok(client.get("/lots"))) == 4
+
+
+def test_LOT_목록_재고있는_것만(client, item_ids):
+    rod = ok(client.post("/receipts", json={"item_id": item_ids["RM-ROD"], "qty": "10"}), 201)
+    plating = ok(client.post("/receipts", json={"item_id": item_ids["RM-PLATING"], "qty": "0.1"}), 201)
+    wo = ok(client.post("/work-orders", json={
+        "item_id": item_ids["FG-BOLT"], "plan_qty": "100", "plan_date": TODAY.isoformat(),
+    }), 201)
+    client.patch(f"/work-orders/{wo['wo_id']}/start")
+    # 강봉·도금액 LOT을 전량 소진
+    ok(client.post(f"/work-orders/{wo['wo_id']}/results", json={
+        "equipment_id": 1, "good_qty": "10", "defect_qty": "0", "worker_name": "김작업",
+        "start_at": f"{TODAY}T09:00:00", "end_at": f"{TODAY}T10:00:00",
+        "inputs": [{"lot_id": rod["lot_id"], "qty": "10"}, {"lot_id": plating["lot_id"], "qty": "0.1"}],
+    }), 201)
+    assert ok(client.get("/lots", params={"item_type": "RAW", "in_stock": "true"})) == []
+    assert len(ok(client.get("/lots", params={"item_type": "RAW"}))) == 2
+
+
+def test_현장_화면_제공(client):
+    resp = client.get("/ui/")
+    assert resp.status_code == 200
+    assert "mini-mes" in resp.text
+    assert "실적 입력" in resp.text

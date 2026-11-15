@@ -1,10 +1,10 @@
 # mini-mes — 초미니 MES
 
-볼트 가공 라인 1개짜리 가상 공장을 대상으로, MES의 기본 개념(기준정보 · 작업지시 · 생산실적 · LOT 추적 · 재고 원장)을 **테이블 7개와 REST API 14개**로 직접 구현한 프로젝트입니다.
+볼트 가공 라인 1개짜리 가상 공장을 대상으로, MES의 기본 개념(기준정보 · 작업지시 · 생산실적 · LOT 추적 · 재고 원장)을 **테이블 7개와 REST API 15개**(+ 현장 화면 1장)로 직접 구현한 프로젝트입니다.
 목표는 "데이터가 어디서 생기고 어디로 흐르는지"를 SQL 수준에서 설명할 수 있게 하는 것입니다.
 
 - 기술 스택: MariaDB 11 · Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2.x Core(`text()`만, ORM 미사용) · PyMySQL · pytest · Docker Compose
-- 화면: 별도 프론트엔드 없이 Swagger UI(`/docs`)를 사용합니다.
+- 화면: **현장 화면 `/ui`** (HTML 1장, 프레임워크 없음) + API 문서 Swagger UI(`/docs`)
 
 ---
 
@@ -132,9 +132,26 @@ docker compose up -d --build
 - 처음 기동할 때 `db/migrations/001_init_schema.sql`, `002_seed_master.sql`이 자동 실행되어 테이블 7개와 기준정보가 들어갑니다.
 - 상태 확인: `docker compose ps` 에서 db가 `healthy`, api가 `Up`이면 준비 완료. (api가 막 `Up`이 된 직후 1~2초는 응답하지 않을 수 있습니다.)
 
-### 4-2. API 화면 열기
+### 4-2. 화면 열기
 
-브라우저에서 <http://localhost:8000/docs> 를 엽니다. (헬스 체크: <http://localhost:8000/health>)
+| 주소 | 용도 |
+| --- | --- |
+| <http://localhost:8000/ui> | **현장 화면**: 사용자 입장에서 입고 → 작업지시 → 실적 입력 → 조회 |
+| <http://localhost:8000/docs> | API 문서 (Swagger UI): API를 하나씩 직접 호출 |
+| <http://localhost:8000/health> | 헬스 체크 |
+
+#### 현장 화면 사용 순서 (7장 시나리오를 화면으로)
+
+1. **① 원자재 입고**: 강봉 1200 입고 → 도금액 20 입고. 오른쪽 표에 LOT과 남은 재고가 나옵니다.
+2. **② 작업지시**: 볼트, 계획 수량 1000, 계획일 오늘 → [작업지시 생성] → 목록에서 [시작] → [실적 입력 →]
+3. **③ 실적 입력**: 설비 CNC-01, 작업자, 양품 480, 불량 20, 불량 코드 SCRATCH
+   - 양품·불량을 입력하면 BOM 기준 소요량(강봉 500, 도금액 5)이 투입 LOT에 자동으로 채워집니다. 투입 합계가 맞으면 ✓, 아니면 ✗로 표시됩니다.
+   - 한 원자재를 여러 LOT에서 나눠 쓰려면 [+ LOT 추가]를 누릅니다.
+   - [실적 등록] → 완제품 LOT 번호와 작업지시 상태가 표시됩니다.
+4. 같은 화면에서 CNC-02, 양품 520, 불량 10, DIMENSION 등록 → 작업지시가 완료(DONE)됩니다.
+5. **④ 조회**: 재고 · 양품률 확인, 완제품 LOT 버튼을 눌러 추적 결과를 봅니다.
+
+업무 규칙에 어긋나는 입력(불량 코드 누락, 재고 부족, BOM 수량 불일치 등)은 화면에 에러 코드와 메시지가 그대로 표시되며, 데이터는 저장되지 않습니다(롤백).
 
 ### 4-3. 테스트 실행
 
@@ -222,6 +239,7 @@ docker compose down -v     # DB 볼륨까지 삭제 (다음 기동 시 시드부
 | 12 | `GET /inventory` | 품목별 재고 |
 | 13 | `GET /lots/{lot_no}/trace` | 완제품 LOT 추적 |
 | 14 | `GET /reports/yield?by=equipment\|work_order` | 그룹별 양품·불량·양품률 |
+| 15 | `GET /lots?item_type=&in_stock=` | LOT 목록과 LOT별 남은 재고 (현장 화면의 투입 LOT 선택용) |
 
 - 생성 API는 `201`, 조회·상태 변경은 `200`을 반환합니다.
 - 수량은 `Decimal`이며 JSON 응답에서는 문자열(`"170.0000"`)로 나옵니다.
@@ -275,6 +293,7 @@ mini-mes/
 │   ├── db.py                # engine, 요청별 connection
 │   ├── errors.py            # BusinessError
 │   ├── schemas.py           # Pydantic 요청·응답 모델
+│   ├── static/index.html    # 현장 화면 (/ui)
 │   ├── routers/             # items, equipment, receipts, work_orders, reports
 │   └── services/
 │       ├── lot_no.py        # 번호 생성
@@ -283,7 +302,7 @@ mini-mes/
     ├── conftest.py          # 테스트 DB 생성·초기화, TestClient
     ├── test_master.py       # 기준정보·입고·작업지시
     ├── test_results.py      # 실적 등록 검증 실패·롤백
-    └── test_scenario.py     # 시나리오 정답 검증
+    └── test_scenario.py     # 시나리오 정답 검증, LOT 목록·화면
 ```
 
 ---
@@ -297,7 +316,7 @@ mini-mes/
 - 다중 공정 라우팅, 공정 간 재공(WIP)
 - 로그인·권한
 - 실적 수정·삭제·취소
-- 별도 프론트엔드 (Swagger UI `/docs`로 대체)
+- 프론트엔드 프레임워크·빌드 도구 (HTML 1장 `/ui` + Swagger UI `/docs`로 대체)
 
 ## 9. 확장 계획
 

@@ -9,7 +9,14 @@ from sqlalchemy import Connection, text
 
 from app.db import get_conn
 from app.errors import not_found
-from app.schemas import InventoryOut, TraceOut, YieldByEquipment, YieldByWorkOrder
+from app.schemas import (
+    InventoryOut,
+    ItemType,
+    LotStockOut,
+    TraceOut,
+    YieldByEquipment,
+    YieldByWorkOrder,
+)
 
 router = APIRouter(tags=["조회"])
 
@@ -61,9 +68,38 @@ ORDER BY w.wo_id
 """
 
 
+# LOT별 남은 재고 (화면용, 설계서 5-5 외 추가)
+SQL_LOTS = """
+SELECT l.lot_id, l.lot_no, i.item_id, i.item_code, i.item_name, i.unit,
+       l.source_type, l.initial_qty,
+       COALESCE(SUM(CASE t.tx_type WHEN 'IN' THEN t.qty ELSE -t.qty END), 0) AS stock_qty,
+       l.created_at
+FROM lot l
+JOIN item i ON i.item_id = l.item_id
+LEFT JOIN inventory_tx t ON t.lot_id = l.lot_id
+WHERE (:item_type IS NULL OR i.item_type = :item_type)
+GROUP BY l.lot_id, l.lot_no, i.item_id, i.item_code, i.item_name, i.unit,
+         l.source_type, l.initial_qty, l.created_at
+HAVING :in_stock = 0 OR stock_qty > 0
+ORDER BY l.lot_id
+"""
+
+
 @router.get("/inventory", response_model=list[InventoryOut])
 def get_inventory(conn: Connection = Depends(get_conn)):
     return conn.execute(text(SQL_INVENTORY)).mappings().all()
+
+
+@router.get("/lots", response_model=list[LotStockOut])
+def list_lots(
+    item_type: ItemType | None = None,
+    in_stock: bool = False,
+    conn: Connection = Depends(get_conn),
+):
+    """LOT 목록과 LOT별 남은 재고. 실적 입력 화면에서 투입 LOT 선택용 (설계서 15번 API)."""
+    return conn.execute(
+        text(SQL_LOTS), {"item_type": item_type, "in_stock": int(in_stock)}
+    ).mappings().all()
 
 
 @router.get("/lots/{lot_no}/trace", response_model=TraceOut)

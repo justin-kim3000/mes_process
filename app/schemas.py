@@ -171,3 +171,16 @@ class YieldByWorkOrder(BaseModel):
     good: Decimal
     defect: Decimal
     yield_pct: Decimal
+
+
+class LotStockOut(BaseModel):
+    lot_id: int
+    lot_no: str
+    item_id: int
+    item_code: str
+    item_name: str
+    unit: str
+    source_type: Literal["RECEIPT", "PRODUCTION"]
+    initial_qty: Decimal
+    stock_qty: Decimal
+    created_at: datetime

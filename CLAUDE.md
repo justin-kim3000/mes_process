@@ -33,7 +33,8 @@ MES의 기본 개념(기준정보, 작업지시, 생산실적, LOT 추적, 재�
 - 다중 공정 라우팅, 공정 간 재공(WIP)
 - 로그인·권한
 - 실적 수정·삭제·취소
-- 별도 프론트엔드 (Swagger UI `/docs`가 화면 역할). 단, 6단계(선택)에서 사용자 승인 시 HTML 1장만 추가.
+- 별도 프론트엔드 프레임워크·빌드 도구 (Swagger UI `/docs` + 6단계 HTML 1장 현장 화면 `/ui`로 대체)
+  - 2026-11-15 사용자 승인으로 6단계 화면 범위 확장: 실적 입력만 → 입고·작업지시·실적 입력·조회 4개 탭 (HTML 1장 유지)
 
 ### 1-4. 설계 원칙
 1. 기준정보(item, bom, equipment)와 실적 데이터(work_order, production_result, lot, inventory_tx)를 분리한다.
@@ -73,6 +74,8 @@ mini-mes/
 │   ├── db.py              # engine 생성, get_conn 의존성
 │   ├── errors.py          # BusinessError(code, message, status)
 │   ├── schemas.py         # Pydantic 요청·응답 모델
+│   ├── static/
+│   │   └── index.html     # 6단계 현장 화면 (/ui)
 │   ├── routers/
 │   │   ├── items.py       # /items, /boms, /items/{id}/bom
 │   │   ├── equipment.py   # /equipment
@@ -253,6 +256,7 @@ INSERT INTO equipment (equipment_code, equipment_name) VALUES
 | 12 | GET /inventory | — | 품목별 재고 (item_code, item_name, unit, stock_qty) |
 | 13 | GET /lots/{lot_no}/trace | — | 완제품 LOT 추적 (5-5) |
 | 14 | GET /reports/yield?by=equipment\|work_order | — | 그룹별 good, defect, yield_pct |
+| 15 | GET /lots?item_type=&in_stock= | — | LOT 목록 + LOT별 남은 재고 (6단계 화면의 투입 LOT 선택용, 2026-11-15 추가) |
 
 ### 5-3. 실적 등록 요청 예시 (API 11)
 
@@ -403,8 +407,15 @@ GROUP BY e.equipment_id, e.equipment_code;
 **완료 확인**
 - 새 환경에서 README 순서대로 따라 하면 `/docs`가 열리고 `pytest`가 통과함
 
-### 6단계 — (선택, 사용자 승인 시에만) 실적 입력 화면
-- `app/static/index.html` 1장: 진행 중 작업지시 선택 → 설비·양품·불량·투입 LOT 입력 → API 11 호출 → 결과 표시
+### 6단계 — (선택, 사용자 승인 시에만) 현장 화면
+> 2026-11-15 사용자 승인. 원래 범위(실적 입력 화면)를 4개 탭으로 확장.
+
+- `app/static/index.html` 1장, 탭 4개
+  - ① 원자재 입고: RAW 품목·수량 입력 → API 7, 원자재 LOT 현황(남은 재고)
+  - ② 작업지시: 생성(API 8), 목록·상태 필터(API 9), [시작](API 10)
+  - ③ 실적 입력: 진행 중 작업지시 선택 → 설비·작업자·시간·양품·불량·불량코드 → BOM 기준 투입 LOT 자동 구성(소요량 자동 계산, LOT 분할 투입) → API 11 → 결과 표시
+  - ④ 조회: 재고(API 12), 양품률(API 14), 완제품 LOT 추적(API 13)
+- 투입 LOT 선택을 위해 API 15 `GET /lots` 추가 (조회 전용)
 - FastAPI `StaticFiles`로 `/ui`에 연결. 프레임워크 없이 HTML + fetch만 사용.
 
 ---
